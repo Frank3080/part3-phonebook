@@ -1,5 +1,6 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
+const path = require("path");
 const express = require("express");
 const app = express();
 const bodyParser = require("body-parser");
@@ -10,7 +11,7 @@ const Person = require("./models/person");
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static("dist"));
+app.use(express.static(path.join(__dirname, "dist")));
 
 morgan.token("postData", (req) => {
   if (req.method === "POST" && req.body) {
