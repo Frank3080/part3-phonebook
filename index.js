@@ -8,6 +8,7 @@ const cors = require("cors");
 const Person = require("./models/person");
 
 // Middleware
+app.use(express.static("public"));
 app.use(cors());
 app.use(express.json());
 
