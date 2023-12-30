@@ -1,13 +1,16 @@
+require("dotenv").config();
+const mongoose = require("mongoose");
 const express = require("express");
 const app = express();
 const bodyParser = require("body-parser");
 const morgan = require("morgan");
 const cors = require("cors");
+const Person = require("./models/person");
 
 app.use(cors());
 app.use(express.json());
 
-//middleware
+// middleware
 morgan.token("postData", (req) => {
   if (req.method === "POST" && req.body) {
     return JSON.stringify(req.body);
@@ -24,86 +27,95 @@ app.use(
 app.use(morgan(customFormat));
 app.use(bodyParser.json());
 
-let persons = [
-  {
-    id: 1,
-    name: "Arto Hellas",
-    number: "040-123456",
-  },
-  {
-    id: 2,
-    name: "Ada Lovelace",
-    number: "39-44-5323523",
-  },
-  {
-    id: 3,
-    name: "Dan Abramov",
-    number: "12-43-234245",
-  },
-  {
-    id: 4,
-    name: "Mary poppendick",
-    number: "39-23-6423122",
-  },
-];
-
 app.get("/api/persons", (req, res) => {
-  res.json(persons);
+  Person.find({})
+    .then((persons) => {
+      res.json(persons);
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({ error: "Internal Server Error" });
+    });
 });
 
 app.get("/api/persons/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const person = persons.find((person) => person.id === id);
-  res.json(person);
+  const id = req.params.id;
 
-  if (!person) {
-    res.status(404).end();
-  }
+  Person.findById(id)
+    .then((person) => {
+      if (!person) {
+        return res.status(404).json({ error: "Person not found" });
+      }
+      res.json(person);
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({ error: "Internal Server Error" });
+    });
 });
-
+// findbyidandDelete didnt work in latest version so i used findOneAndDelete()
 app.delete("/api/persons/:id", (req, res) => {
-  const id = Number(req.params.id);
-  persons = persons.filter((person) => person.id !== id);
+  const id = req.params.id;
 
-  res.status(204).end();
+  Person.findOneAndDelete({ _id: id })
+    .then((deletedPerson) => {
+      if (!deletedPerson) {
+        return res.status(404).json({ error: "Person not found" });
+      }
+      res.status(204).end();
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({ error: "Internal Server Error" });
+    });
 });
 
 app.post("/api/persons", (req, res) => {
   const body = req.body;
+
   if (!body.name || !body.number) {
     return res.status(400).json({ error: "You have to put name and number" });
   }
 
-  const nameExists = persons.some((person) => person.name === body.name);
-
-  if (nameExists) {
-    return res.status(400).json({ error: "Name already exists" });
-  }
-
-  const newPerson = {
-    id: generateId(),
+  Person.create({
     name: body.name,
     number: body.number,
-  };
-
-  persons = persons.concat(newPerson);
-
-  res.json(newPerson);
+  })
+    .then((newPerson) => {
+      res.json(newPerson);
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({ error: "Internal Server Error" });
+    });
 });
 
 app.get("/info", (req, res) => {
-  const currentDate = new Date();
+  Person.countDocuments({}, (err, count) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
 
-  res.send(
-    `<p>Phonebook has info for ${persons.length} people</p> <p>${currentDate}</p>`
-  );
+    const currentDate = new Date();
+    res.send(
+      `<p>Phonebook has info for ${count} people</p> <p>${currentDate}</p>`
+    );
+  });
 });
-
-function generateId() {
-  return Math.floor(Math.random() * 1000000);
-}
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+mongoose
+  .connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => {
+    console.log("Connected to MongoDB");
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error("Error connecting to MongoDB:", error);
+  });
