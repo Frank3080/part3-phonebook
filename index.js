@@ -7,10 +7,10 @@ const morgan = require("morgan");
 const cors = require("cors");
 const Person = require("./models/person");
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// middleware
 morgan.token("postData", (req) => {
   if (req.method === "POST" && req.body) {
     return JSON.stringify(req.body);
@@ -27,18 +27,16 @@ app.use(
 app.use(morgan(customFormat));
 app.use(bodyParser.json());
 
-app.get("/api/persons", (req, res) => {
+// Routes
+app.get("/api/persons", (req, res, next) => {
   Person.find({})
     .then((persons) => {
       res.json(persons);
     })
-    .catch((error) => {
-      console.error(error);
-      res.status(500).json({ error: "Internal Server Error" });
-    });
+    .catch((err) => next(err));
 });
 
-app.get("/api/persons/:id", (req, res) => {
+app.get("/api/persons/:id", (req, res, next) => {
   const id = req.params.id;
 
   Person.findById(id)
@@ -48,13 +46,10 @@ app.get("/api/persons/:id", (req, res) => {
       }
       res.json(person);
     })
-    .catch((error) => {
-      console.error(error);
-      res.status(500).json({ error: "Internal Server Error" });
-    });
+    .catch((err) => next(err));
 });
-// findbyidandDelete didnt work in latest version so i used findOneAndDelete()
-app.delete("/api/persons/:id", (req, res) => {
+
+app.delete("/api/persons/:id", (req, res, next) => {
   const id = req.params.id;
 
   Person.findOneAndDelete({ _id: id })
@@ -64,13 +59,10 @@ app.delete("/api/persons/:id", (req, res) => {
       }
       res.status(204).end();
     })
-    .catch((error) => {
-      console.error(error);
-      res.status(500).json({ error: "Internal Server Error" });
-    });
+    .catch((err) => next(err));
 });
 
-app.post("/api/persons", (req, res) => {
+app.post("/api/persons", (req, res, next) => {
   const body = req.body;
 
   if (!body.name || !body.number) {
@@ -84,17 +76,14 @@ app.post("/api/persons", (req, res) => {
     .then((newPerson) => {
       res.json(newPerson);
     })
-    .catch((error) => {
-      console.error(error);
-      res.status(500).json({ error: "Internal Server Error" });
-    });
+    .catch((err) => next(err));
 });
 
-app.get("/info", (req, res) => {
+app.get("/info", (req, res, next) => {
   Person.countDocuments({}, (err, count) => {
     if (err) {
       console.error(err);
-      return res.status(500).json({ error: "Internal Server Error" });
+      return res.status(404).json({ error: "Person not found" });
     }
 
     const currentDate = new Date();
@@ -104,7 +93,23 @@ app.get("/info", (req, res) => {
   });
 });
 
+// Error handler middleware
+const errorHandler = (err, req, res, next) => {
+  console.error(err.message);
+
+  if (err.name === "CastError" && err.kind === "ObjectId") {
+    return res.status(400).send({ error: "malformatted id" });
+  } else if (err.name === "ValidationError") {
+    return res.status(400).json({ error: err.message });
+  }
+
+  res.status(500).send({ error: "Internal Server Error" });
+};
+
+app.use(errorHandler);
+
 const PORT = process.env.PORT || 3001;
+
 mongoose
   .connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
