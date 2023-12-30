@@ -95,7 +95,12 @@ app.get("/info", (req, res, next) => {
   });
 });
 
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "assets", "index-xPR5u1GK.js"));
+});
+
 // Error handler middleware
+
 const errorHandler = (err, req, res, next) => {
   console.error(err.message);
 
